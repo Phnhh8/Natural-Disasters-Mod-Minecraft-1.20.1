@@ -1,0 +1,10 @@
+{
+  "itemGroup.naturaldisasters": "Natural Disasters",
+  "item.naturaldisasters.meteor_caller": "Triệu Hồi Mưa Thiên Thạch",
+  "item.naturaldisasters.earthquake_caller": "Triệu Hồi Động Đất",
+  "item.naturaldisasters.acid_rain_caller": "Triệu Hồi Mưa Axit",
+  "item.naturaldisasters.tornado_caller": "Triệu Hồi Lốc Xoáy",
+  "item.naturaldisasters.landslide_caller": "Triệu Hồi Sạt Lở Đất",
+  "item.naturaldisasters.nuke_caller": "Triệu Hồi Bom Nguyên Tử",
+  "item.naturaldisasters.disaster_stopper": "Ngừng Thảm Họa"
+}
