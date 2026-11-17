@@ -176,7 +176,7 @@ public class NaturalDisastersMod implements ModInitializer {
                 }
             }
             case "ACID_RAIN" -> {
-                level.setWeatherParameters(0, 400, true, true);
+level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "weather thunder 20");
                 if (level.canSeeSky(pos)) {
                     p.addEffect(new MobEffectInstance(MobEffects.POISON, 40, 1));
                     if (level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)) level.setBlockAndUpdate(pos.below(), Blocks.DIRT.defaultBlockState());
