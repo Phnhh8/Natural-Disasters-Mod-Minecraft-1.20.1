@@ -1,16 +1,24 @@
 package com.example.disasters;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -26,20 +34,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
 import java.util.Random;
 
-@Mod("naturaldisasters")
-public class NaturalDisastersMod {
+public class NaturalDisastersMod implements ModInitializer {
     public static final String MODID = "naturaldisasters";
     private static int tickCounter = 0, disasterDuration = 0;
     private static String activeDisaster = "NONE";
@@ -47,53 +44,74 @@ public class NaturalDisastersMod {
     private static BlockPos nukeTargetPos = null;
     private static final Random RANDOM = new Random();
 
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-    public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
+    public static final Item METEOR_CALLER = registerItem("meteor_caller", "METEOR");
+    public static final Item EARTHQUAKE_CALLER = registerItem("earthquake_caller", "EARTHQUAKE");
+    public static final Item ACID_RAIN_CALLER = registerItem("acid_rain_caller", "ACID_RAIN");
+    public static final Item TORNADO_CALLER = registerItem("tornado_caller", "TORNADO");
+    public static final Item LANDSLIDE_CALLER = registerItem("landslide_caller", "LANDSLIDE");
+    public static final Item NUKE_CALLER = registerItem("nuke_caller", "NUKE");
+    public static final Item DISASTER_STOPPER = registerItem("disaster_stopper", "STOP");
 
-    public static final RegistryObject<Item> METEOR_CALLER = ITEMS.register("meteor_caller", () -> new DisasterItem("METEOR"));
-    public static final RegistryObject<Item> EARTHQUAKE_CALLER = ITEMS.register("earthquake_caller", () -> new DisasterItem("EARTHQUAKE"));
-    public static final RegistryObject<Item> ACID_RAIN_CALLER = ITEMS.register("acid_rain_caller", () -> new DisasterItem("ACID_RAIN"));
-    public static final RegistryObject<Item> TORNADO_CALLER = ITEMS.register("tornado_caller", () -> new DisasterItem("TORNADO"));
-    public static final RegistryObject<Item> LANDSLIDE_CALLER = ITEMS.register("landslide_caller", () -> new DisasterItem("LANDSLIDE"));
-    public static final RegistryObject<Item> NUKE_CALLER = ITEMS.register("nuke_caller", () -> new DisasterItem("NUKE"));
-    public static final RegistryObject<Item> DISASTER_STOPPER = ITEMS.register("disaster_stopper", () -> new DisasterItem("STOP"));
+    private static Item registerItem(String name, String type) {
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
+        ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
+        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type));
+    }
 
-    public static final RegistryObject<CreativeModeTab> DISASTER_TAB = TABS.register("disaster_tab", () -> CreativeModeTab.builder()
-        .title(Component.translatable("itemGroup.naturaldisasters"))
-        .icon(() -> new ItemStack(NUKE_CALLER.get()))
-        .displayItems((p, out) -> {
-            out.accept(METEOR_CALLER.get()); out.accept(EARTHQUAKE_CALLER.get()); out.accept(ACID_RAIN_CALLER.get());
-            out.accept(TORNADO_CALLER.get()); out.accept(LANDSLIDE_CALLER.get()); out.accept(NUKE_CALLER.get());
-            out.accept(DISASTER_STOPPER.get());
-        }).build());
+    public static final CreativeModeTab DISASTER_TAB = Registry.register(
+        BuiltInRegistries.CREATIVE_MODE_TAB,
+        ResourceLocation.fromNamespaceAndPath(MODID, "disaster_tab"),
+        FabricItemGroup.builder()
+            .title(Component.translatable("itemGroup.naturaldisasters"))
+            .icon(() -> new ItemStack(NUKE_CALLER))
+            .displayItems((params, out) -> {
+                out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
+                out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
+                out.accept(DISASTER_STOPPER);
+            }).build()
+    );
+    @Override
+    public void onInitialize() {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            dispatcher.register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
+                .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
+                    startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
+                    return 1;
+                })));
+        });
 
-    public NaturalDisastersMod() {
-        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
-        ITEMS.register(bus); TABS.register(bus); MinecraftForge.EVENT_BUS.register(this);
+        ServerTickEvents.END_WORLD_TICK.register(level -> {
+            if (level.players().isEmpty()) return;
+            if (++tickCounter >= 6000) {
+                tickCounter = 0;
+                String[] list = {"METEOR", "EARTHQUAKE", "ACID_RAIN", "TORNADO", "LANDSLIDE", "NUKE"};
+                ServerPlayer rp = level.players().get(RANDOM.nextInt(level.players().size()));
+                startDisaster(level, list[RANDOM.nextInt(list.length)], rp.blockPosition());
+            }
+            if (disasterDuration > 0) {
+                disasterDuration--;
+                if (activeDisaster.equals("TORNADO") && tornadoPos != null) runTornado(level);
+                else if (activeDisaster.equals("NUKE") && nukeTargetPos != null) runNuke(level);
+                else for (ServerPlayer p : level.players()) runPlayerDisaster(level, p);
+                if (disasterDuration == 0) { activeDisaster = "NONE"; tornadoPos = null; nukeTargetPos = null; }
+            }
+        });
     }
 
     public static class DisasterItem extends Item {
         private final String type;
-        public DisasterItem(String type) { super(new Properties().stacksTo(1)); this.type = type; }
+        public DisasterItem(Properties props, String type) { super(props); this.type = type; }
         @Override
-        public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        public InteractionResult use(Level level, Player player, InteractionHand hand) {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
                     activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; nukeTargetPos = null;
                     player.sendSystemMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"));
                 } else startDisaster(sl, type, player.blockPosition());
-                player.getCooldowns().addCooldown(this, 40);
+                player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
             }
-            return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide());
+            return InteractionResult.SUCCESS;
         }
-    }
-    @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
-            .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
-                startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
-                return 1;
-            })));
     }
 
     public static void startDisaster(ServerLevel level, String type, BlockPos pos) {
@@ -104,27 +122,7 @@ public class NaturalDisastersMod {
         for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
     }
 
-    @SubscribeEvent
-    public void onServerTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.level.isClientSide()) return;
-        ServerLevel level = (ServerLevel) event.level;
-        if (level.players().isEmpty()) return;
-        if (++tickCounter >= 6000) {
-            tickCounter = 0;
-            String[] list = {"METEOR", "EARTHQUAKE", "ACID_RAIN", "TORNADO", "LANDSLIDE", "NUKE"};
-            ServerPlayer rp = level.players().get(RANDOM.nextInt(level.players().size()));
-            startDisaster(level, list[RANDOM.nextInt(list.length)], rp.blockPosition());
-        }
-        if (disasterDuration > 0) {
-            disasterDuration--;
-            if (activeDisaster.equals("TORNADO") && tornadoPos != null) runTornado(level);
-            else if (activeDisaster.equals("NUKE") && nukeTargetPos != null) runNuke(level);
-            else for (ServerPlayer p : level.players()) runPlayerDisaster(level, p);
-            if (disasterDuration == 0) { activeDisaster = "NONE"; tornadoPos = null; nukeTargetPos = null; }
-        }
-    }
-
-    private void runTornado(ServerLevel level) {
+    private static void runTornado(ServerLevel level) {
         Vec3 dir = level.players().get(0).position().subtract(tornadoPos).normalize();
         tornadoPos = tornadoPos.add(dir.x * 0.25, 0, dir.z * 0.25);
         for (int y = 0; y < 30; y++) {
@@ -138,22 +136,14 @@ public class NaturalDisastersMod {
             double dx = tornadoPos.x - e.getX(), dz = tornadoPos.z - e.getZ();
             e.setDeltaMovement(new Vec3(dx * 0.08 - dz * 0.12, 0.35, dz * 0.08 + dx * 0.12)); e.hurtMarked = true;
         }
-        if (disasterDuration % 4 == 0) {
-            BlockPos c = BlockPos.containing(tornadoPos);
-            for (int i = 0; i < 5; i++) {
-                BlockPos bp = c.offset(RANDOM.nextInt(10) - 5, RANDOM.nextInt(8), RANDOM.nextInt(10) - 5);
-                BlockState s = level.getBlockState(bp);
-                if (!s.isAir() && s.getDestroySpeed(level, bp) >= 0 && s.getDestroySpeed(level, bp) <= 1.5f) level.destroyBlock(bp, false);
-            }
-        }
     }
 
-    private void runNuke(ServerLevel level) {
+    private static void runNuke(ServerLevel level) {
         if (disasterDuration > 100) {
             if (disasterDuration % 20 == 0) {
                 for (ServerPlayer p : level.players()) {
                     p.sendSystemMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"));
-                    level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.MASTER, 1f, 0.5f);
+                    level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.MASTER, 1f, 0.5f);
                 }
             }
             level.sendParticles(ParticleTypes.FLAME, nukeTargetPos.getX(), nukeTargetPos.getY() + 2, nukeTargetPos.getZ(), 15, 0.5, 10, 0.5, 0.05);
@@ -167,12 +157,12 @@ public class NaturalDisastersMod {
         } else level.sendParticles(ParticleTypes.ASH, nukeTargetPos.getX(), nukeTargetPos.getY() + 15, nukeTargetPos.getZ(), 80, 20, 10, 20, 0.02);
     }
 
-    private void runPlayerDisaster(ServerLevel level, ServerPlayer p) {
+    private static void runPlayerDisaster(ServerLevel level, ServerPlayer p) {
         BlockPos pos = p.blockPosition();
         switch (activeDisaster) {
             case "METEOR" -> {
                 if (disasterDuration % 20 == 0) {
-                    LargeFireball fb = new LargeFireball(level, p, 0, -1.5, 0, 3);
+                    LargeFireball fb = new LargeFireball(level, p, new Vec3(0, -1.5, 0), 3);
                     fb.setPos(pos.getX() + RANDOM.nextInt(30) - 15, pos.getY() + 35, pos.getZ() + RANDOM.nextInt(30) - 15);
                     level.addFreshEntity(fb);
                 }
@@ -205,3 +195,4 @@ public class NaturalDisastersMod {
         }
     }
 }
+
