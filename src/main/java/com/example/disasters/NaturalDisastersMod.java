@@ -2,8 +2,8 @@ package com.example.disasters;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -11,10 +11,11 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -25,7 +26,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.LargeFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -53,15 +54,15 @@ public class NaturalDisastersMod implements ModInitializer {
     public static final Item DISASTER_STOPPER = registerItem("disaster_stopper", "STOP");
 
     private static Item registerItem(String name, String type) {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
+        Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
         return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
         BuiltInRegistries.CREATIVE_MODE_TAB,
-        ResourceLocation.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricItemGroup.builder()
+        Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
+        FabricCreativeModeTab.builder()
             .title(Component.translatable("itemGroup.naturaldisasters"))
             .icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((params, out) -> {
@@ -73,14 +74,14 @@ public class NaturalDisastersMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
+            dispatcher.register(Commands.literal("disaster").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                 .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
                     startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
                     return 1;
                 })));
         });
 
-        ServerTickEvents.END_WORLD_TICK.register(level -> {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
             if (level.players().isEmpty()) return;
             if (++tickCounter >= 6000) {
                 tickCounter = 0;
@@ -134,7 +135,7 @@ public class NaturalDisastersMod implements ModInitializer {
         }
         for (Entity e : level.getEntities(null, new AABB(tornadoPos.x - 18, tornadoPos.y - 5, tornadoPos.z - 18, tornadoPos.x + 18, tornadoPos.y + 35, tornadoPos.z + 18))) {
             double dx = tornadoPos.x - e.getX(), dz = tornadoPos.z - e.getZ();
-            e.setDeltaMovement(new Vec3(dx * 0.08 - dz * 0.12, 0.35, dz * 0.08 + dx * 0.12)); e.hurtMarked = true;
+            e.setDeltaMovement(new Vec3(dx * 0.08 - dz * 0.12, 0.35, dz * 0.08 + dx * 0.12)); e.needsSync = true;
         }
     }
 
@@ -151,7 +152,7 @@ public class NaturalDisastersMod implements ModInitializer {
             level.explode(null, nukeTargetPos.getX(), nukeTargetPos.getY(), nukeTargetPos.getZ(), 22f, true, Level.ExplosionInteraction.BLOCK);
             for (LivingEntity le : level.getEntitiesOfClass(LivingEntity.class, new AABB(nukeTargetPos).inflate(45))) {
                 le.addEffect(new MobEffectInstance(MobEffects.WITHER, 300, 1));
-                le.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 300, 0));
+                le.addEffect(new MobEffectInstance(MobEffects.NAUSEA, 300, 0));
                 le.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100, 0));
             }
         } else level.sendParticles(ParticleTypes.ASH, nukeTargetPos.getX(), nukeTargetPos.getY() + 15, nukeTargetPos.getZ(), 80, 20, 10, 20, 0.02);
@@ -168,7 +169,7 @@ public class NaturalDisastersMod implements ModInitializer {
                 }
             }
             case "EARTHQUAKE" -> {
-                p.setDeltaMovement(p.getDeltaMovement().add((RANDOM.nextDouble() - 0.5) * 0.4, 0.15, (RANDOM.nextDouble() - 0.5) * 0.4)); p.hurtMarked = true;
+                p.setDeltaMovement(p.getDeltaMovement().add((RANDOM.nextDouble() - 0.5) * 0.4, 0.15, (RANDOM.nextDouble() - 0.5) * 0.4)); p.needsSync = true;
                 if (disasterDuration % 5 == 0) {
                     BlockPos cp = pos.offset(RANDOM.nextInt(12) - 6, -1, RANDOM.nextInt(12) - 6);
                     if (!level.getBlockState(cp).isAir() && level.getBlockState(cp).getDestroySpeed(level, cp) >= 0) level.destroyBlock(cp, false);
@@ -195,4 +196,3 @@ public class NaturalDisastersMod implements ModInitializer {
         }
     }
 }
-
