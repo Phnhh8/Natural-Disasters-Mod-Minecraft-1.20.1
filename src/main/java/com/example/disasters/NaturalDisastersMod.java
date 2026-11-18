@@ -73,6 +73,7 @@ public class NaturalDisastersMod implements ModInitializer {
     );
     @Override
     public void onInitialize() {
+        Object initTab = DISASTER_TAB;
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("disaster").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                 .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
@@ -176,7 +177,7 @@ public class NaturalDisastersMod implements ModInitializer {
                 }
             }
             case "ACID_RAIN" -> {
-level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "weather thunder 20");
+                level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "weather thunder 20");
                 if (level.canSeeSky(pos)) {
                     p.addEffect(new MobEffectInstance(MobEffects.POISON, 40, 1));
                     if (level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)) level.setBlockAndUpdate(pos.below(), Blocks.DIRT.defaultBlockState());
