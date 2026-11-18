@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "naturaldisasters",
+  "version": "${version}",
+  "name": "Natural Disasters Mod",
+  "description": "Natural Disasters for 26.3",
+  "authors": ["Phnhh8"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.example.disasters.NaturalDisastersMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "fabric-api": "*"
+  }
+}
