@@ -3,8 +3,8 @@
   "id": "naturaldisasters",
   "version": "${version}",
   "name": "Natural Disasters Mod",
-  "description": "6 thảm họa thiên nhiên và Creative Tab cho Minecraft 26.3",
-  "authors": ["You"],
+  "description": "Natural Disasters for 26.3",
+  "authors": ["Phnhh8"],
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
