@@ -132,7 +132,7 @@ public class NaturalDisastersMod implements ModInitializer {
         if (type.equals("TORNADO")) tornadoPos = new Vec3(pos.getX() + 15, pos.getY(), pos.getZ() + 15);
         else if (type.equals("NUKE")) targetPos = pos.offset(RANDOM.nextInt(16) - 8, 0, RANDOM.nextInt(16) - 8);
         else if (type.equals("TSUNAMI")) { targetPos = pos.offset(-35, 0, 0); tsunamiWaveX = 0; }
-        else if (type.equals("VOLCANO")) targetPos = pos.offset(18, 0, 18);
+        else if (type.equals("VOLCANO")) targetPos = pos.offset(24, 0, 24);
         else if (type.equals("SINKHOLE")) targetPos = pos;
         else if (type.equals("ZOMBIE_APOCALYPSE")) cmd(level, "time set midnight");
         for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
@@ -156,23 +156,46 @@ public class NaturalDisastersMod implements ModInitializer {
     }
 
     private static void runVolcano(ServerLevel level) {
-        if (disasterDuration > 250 && disasterDuration % 2 == 0) {
-            int h = (400 - disasterDuration) / 8;
-            int r = Math.max(2, 16 - h);
+        if (disasterDuration > 240) {
+            int h = (400 - disasterDuration) / 5;
+            int r = Math.max(4, 26 - (int)(h * 0.7));
             for (int x = -r; x <= r; x++) {
                 for (int z = -r; z <= r; z++) {
                     if (x * x + z * z <= r * r) {
                         BlockPos bp = targetPos.offset(x, h, z);
-                        level.setBlockAndUpdate(bp, (x * x + z * z <= 4 && h > 10) ? Blocks.LAVA.defaultBlockState() : Blocks.BASALT.defaultBlockState());
+                        boolean isCore = (x * x + z * z <= 12 && h > 8);
+                        level.setBlockAndUpdate(bp, isCore ? Blocks.LAVA.defaultBlockState() : (RANDOM.nextBoolean() ? Blocks.BASALT.defaultBlockState() : Blocks.OBSIDIAN.defaultBlockState()));
                     }
                 }
             }
-        } else if (disasterDuration % 10 == 0) {
-            BlockPos top = targetPos.above(18);
-            level.setBlockAndUpdate(top, Blocks.LAVA.defaultBlockState());
-            LargeFireball fb = new LargeFireball(level, level.players().get(0), new Vec3((RANDOM.nextDouble() - 0.5) * 2, 0.8, (RANDOM.nextDouble() - 0.5) * 2), 2);
-            fb.setPos(top.getX(), top.getY() + 2, top.getZ());
-            level.addFreshEntity(fb);
+            if (disasterDuration == 241) {
+                level.explode(null, targetPos.getX(), targetPos.getY() + 32, targetPos.getZ(), 10.0f, true, Level.ExplosionInteraction.BLOCK);
+                cmd(level, "weather thunder 30");
+            }
+        } else {
+            BlockPos top = targetPos.above(30);
+            level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, top.getX(), top.getY() + 3, top.getZ(), 40, 3.0, 4.0, 3.0, 0.08);
+            level.sendParticles(ParticleTypes.LAVA, top.getX(), top.getY() + 2, top.getZ(), 30, 3.0, 2.0, 3.0, 0.2);
+
+            if (disasterDuration % 4 == 0) {
+                for (int i = 0; i < 4; i++) {
+                    double vx = (RANDOM.nextDouble() - 0.5) * 3.2;
+                    double vz = (RANDOM.nextDouble() - 0.5) * 3.2;
+                    LargeFireball fb = new LargeFireball(level, level.players().get(0), new Vec3(vx, 1.1, vz), 4);
+                    fb.setPos(top.getX() + RANDOM.nextInt(5) - 2, top.getY() + 3, top.getZ() + RANDOM.nextInt(5) - 2);
+                    level.addFreshEntity(fb);
+                }
+                BlockPos spill = top.offset(RANDOM.nextInt(7) - 3, 1, RANDOM.nextInt(7) - 3);
+                level.setBlockAndUpdate(spill, Blocks.LAVA.defaultBlockState());
+            }
+
+            for (int i = 0; i < 6; i++) {
+                BlockPos ground = targetPos.offset(RANDOM.nextInt(50) - 25, RANDOM.nextInt(6) - 2, RANDOM.nextInt(50) - 25);
+                if (level.getBlockState(ground).isSolid() && level.getBlockState(ground.above()).isAir()) {
+                    level.setBlockAndUpdate(ground, Blocks.MAGMA_BLOCK.defaultBlockState());
+                    if (RANDOM.nextInt(3) == 0) level.setBlockAndUpdate(ground.above(), Blocks.FIRE.defaultBlockState());
+                }
+            }
         }
     }
     private static void runSinkhole(ServerLevel level) {
