@@ -23,8 +23,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
 import net.minecraft.world.item.CreativeModeTab;
@@ -39,35 +43,40 @@ import java.util.Random;
 
 public class NaturalDisastersMod implements ModInitializer {
     public static final String MODID = "naturaldisasters";
-    private static int tickCounter = 0, disasterDuration = 0;
+    private static int tickCounter = 0, disasterDuration = 0, tsunamiWaveX = 0;
     private static String activeDisaster = "NONE";
     private static Vec3 tornadoPos = null;
-    private static BlockPos nukeTargetPos = null;
+    private static BlockPos targetPos = null;
     private static final Random RANDOM = new Random();
 
-    public static final Item METEOR_CALLER = registerItem("meteor_caller", "METEOR");
-    public static final Item EARTHQUAKE_CALLER = registerItem("earthquake_caller", "EARTHQUAKE");
-    public static final Item ACID_RAIN_CALLER = registerItem("acid_rain_caller", "ACID_RAIN");
-    public static final Item TORNADO_CALLER = registerItem("tornado_caller", "TORNADO");
-    public static final Item LANDSLIDE_CALLER = registerItem("landslide_caller", "LANDSLIDE");
-    public static final Item NUKE_CALLER = registerItem("nuke_caller", "NUKE");
-    public static final Item DISASTER_STOPPER = registerItem("disaster_stopper", "STOP");
+    public static final Item METEOR_CALLER = reg("meteor_caller", "METEOR");
+    public static final Item EARTHQUAKE_CALLER = reg("earthquake_caller", "EARTHQUAKE");
+    public static final Item ACID_RAIN_CALLER = reg("acid_rain_caller", "ACID_RAIN");
+    public static final Item TORNADO_CALLER = reg("tornado_caller", "TORNADO");
+    public static final Item LANDSLIDE_CALLER = reg("landslide_caller", "LANDSLIDE");
+    public static final Item NUKE_CALLER = reg("nuke_caller", "NUKE");
+    public static final Item TSUNAMI_CALLER = reg("tsunami_caller", "TSUNAMI");
+    public static final Item VOLCANO_CALLER = reg("volcano_caller", "VOLCANO");
+    public static final Item SINKHOLE_CALLER = reg("sinkhole_caller", "SINKHOLE");
+    public static final Item LIGHTNING_CALLER = reg("lightning_caller", "LIGHTNING_STORM");
+    public static final Item BLIZZARD_CALLER = reg("blizzard_caller", "BLIZZARD");
+    public static final Item ZOMBIE_CALLER = reg("zombie_caller", "ZOMBIE_APOCALYPSE");
+    public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP");
 
-    private static Item registerItem(String name, String type) {
+    private static Item reg(String name, String type) {
         Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
         return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
-        BuiltInRegistries.CREATIVE_MODE_TAB,
-        Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricCreativeModeTab.builder()
-            .title(Component.translatable("itemGroup.naturaldisasters"))
-            .icon(() -> new ItemStack(NUKE_CALLER))
-            .displayItems((params, out) -> {
+        BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
+        FabricCreativeModeTab.builder().title(Component.translatable("itemGroup.naturaldisasters")).icon(() -> new ItemStack(NUKE_CALLER))
+            .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
                 out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
+                out.accept(TSUNAMI_CALLER); out.accept(VOLCANO_CALLER); out.accept(SINKHOLE_CALLER);
+                out.accept(LIGHTNING_CALLER); out.accept(BLIZZARD_CALLER); out.accept(ZOMBIE_CALLER);
                 out.accept(DISASTER_STOPPER);
             }).build()
     );
@@ -86,16 +95,21 @@ public class NaturalDisastersMod implements ModInitializer {
             if (level.players().isEmpty()) return;
             if (++tickCounter >= 6000) {
                 tickCounter = 0;
-                String[] list = {"METEOR", "EARTHQUAKE", "ACID_RAIN", "TORNADO", "LANDSLIDE", "NUKE"};
+                String[] list = {"METEOR", "EARTHQUAKE", "ACID_RAIN", "TORNADO", "LANDSLIDE", "NUKE", "TSUNAMI", "VOLCANO", "SINKHOLE", "LIGHTNING_STORM", "BLIZZARD", "ZOMBIE_APOCALYPSE"};
                 ServerPlayer rp = level.players().get(RANDOM.nextInt(level.players().size()));
                 startDisaster(level, list[RANDOM.nextInt(list.length)], rp.blockPosition());
             }
             if (disasterDuration > 0) {
                 disasterDuration--;
-                if (activeDisaster.equals("TORNADO") && tornadoPos != null) runTornado(level);
-                else if (activeDisaster.equals("NUKE") && nukeTargetPos != null) runNuke(level);
-                else for (ServerPlayer p : level.players()) runPlayerDisaster(level, p);
-                if (disasterDuration == 0) { activeDisaster = "NONE"; tornadoPos = null; nukeTargetPos = null; }
+                switch (activeDisaster) {
+                    case "TORNADO" -> { if (tornadoPos != null) runTornado(level); }
+                    case "NUKE" -> { if (targetPos != null) runNuke(level); }
+                    case "TSUNAMI" -> { if (targetPos != null) runTsunami(level); }
+                    case "VOLCANO" -> { if (targetPos != null) runVolcano(level); }
+                    case "SINKHOLE" -> { if (targetPos != null) runSinkhole(level); }
+                    default -> { for (ServerPlayer p : level.players()) runPlayerDisaster(level, p); }
+                }
+                if (disasterDuration == 0) { activeDisaster = "NONE"; tornadoPos = null; targetPos = null; }
             }
         });
     }
@@ -107,7 +121,7 @@ public class NaturalDisastersMod implements ModInitializer {
         public InteractionResult use(Level level, Player player, InteractionHand hand) {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
-                    activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; nukeTargetPos = null;
+                    activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; targetPos = null;
                     player.sendSystemMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"));
                 } else startDisaster(sl, type, player.blockPosition());
                 player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
@@ -118,10 +132,67 @@ public class NaturalDisastersMod implements ModInitializer {
 
     public static void startDisaster(ServerLevel level, String type, BlockPos pos) {
         activeDisaster = type;
-        disasterDuration = type.equals("NUKE") ? 200 : 400;
+        disasterDuration = type.equals("NUKE") ? 200 : (type.equals("SINKHOLE") ? 120 : 400);
         if (type.equals("TORNADO")) tornadoPos = new Vec3(pos.getX() + 15, pos.getY(), pos.getZ() + 15);
-        else if (type.equals("NUKE")) nukeTargetPos = pos.offset(RANDOM.nextInt(16) - 8, 0, RANDOM.nextInt(16) - 8);
+        else if (type.equals("NUKE")) targetPos = pos.offset(RANDOM.nextInt(16) - 8, 0, RANDOM.nextInt(16) - 8);
+        else if (type.equals("TSUNAMI")) { targetPos = pos.offset(-35, 0, 0); tsunamiWaveX = 0; }
+        else if (type.equals("VOLCANO")) targetPos = pos.offset(18, 0, 18);
+        else if (type.equals("SINKHOLE")) targetPos = pos;
+        else if (type.equals("ZOMBIE_APOCALYPSE")) cmd(level, "time set midnight");
         for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
+    }
+
+    private static void cmd(ServerLevel l, String c) {
+        l.getServer().getCommands().performPrefixedCommand(l.getServer().createCommandSourceStack().withSuppressedOutput(), c);
+    }
+
+    private static void runTsunami(ServerLevel level) {
+        if (disasterDuration % 4 == 0 && tsunamiWaveX < 70) {
+            int cx = targetPos.getX() + tsunamiWaveX;
+            for (int z = -25; z <= 25; z++) {
+                for (int y = 0; y < 14; y++) {
+                    BlockPos wp = new BlockPos(cx, targetPos.getY() + y, targetPos.getZ() + z);
+                    if (level.getBlockState(wp).canBeReplaced()) level.setBlockAndUpdate(wp, Blocks.WATER.defaultBlockState());
+                }
+            }
+            tsunamiWaveX++;
+        }
+    }
+
+    private static void runVolcano(ServerLevel level) {
+        if (disasterDuration > 250 && disasterDuration % 2 == 0) {
+            int h = (400 - disasterDuration) / 8;
+            int r = Math.max(2, 16 - h);
+            for (int x = -r; x <= r; x++) {
+                for (int z = -r; z <= r; z++) {
+                    if (x * x + z * z <= r * r) {
+                        BlockPos bp = targetPos.offset(x, h, z);
+                        level.setBlockAndUpdate(bp, (x * x + z * z <= 4 && h > 10) ? Blocks.LAVA.defaultBlockState() : Blocks.BASALT.defaultBlockState());
+                    }
+                }
+            }
+        } else if (disasterDuration % 10 == 0) {
+            BlockPos top = targetPos.above(18);
+            level.setBlockAndUpdate(top, Blocks.LAVA.defaultBlockState());
+            LargeFireball fb = new LargeFireball(level, level.players().get(0), new Vec3((RANDOM.nextDouble() - 0.5) * 2, 0.8, (RANDOM.nextDouble() - 0.5) * 2), 2);
+            fb.setPos(top.getX(), top.getY() + 2, top.getZ());
+            level.addFreshEntity(fb);
+        }
+    }
+
+    private static void runSinkhole(ServerLevel level) {
+        if (disasterDuration % 3 == 0) {
+            int depth = (120 - disasterDuration) / 3;
+            int r = 9;
+            for (int x = -r; x <= r; x++) {
+                for (int z = -r; z <= r; z++) {
+                    if (x * x + z * z <= r * r) {
+                        BlockPos bp = targetPos.offset(x, -depth, z);
+                        if (!level.getBlockState(bp).is(Blocks.BEDROCK)) level.setBlockAndUpdate(bp, Blocks.AIR.defaultBlockState());
+                    }
+                }
+            }
+        }
     }
 
     private static void runTornado(ServerLevel level) {
@@ -148,15 +219,15 @@ public class NaturalDisastersMod implements ModInitializer {
                     level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.MASTER, 1f, 0.5f);
                 }
             }
-            level.sendParticles(ParticleTypes.FLAME, nukeTargetPos.getX(), nukeTargetPos.getY() + 2, nukeTargetPos.getZ(), 15, 0.5, 10, 0.5, 0.05);
+            level.sendParticles(ParticleTypes.FLAME, targetPos.getX(), targetPos.getY() + 2, targetPos.getZ(), 15, 0.5, 10, 0.5, 0.05);
         } else if (disasterDuration == 100) {
-            level.explode(null, nukeTargetPos.getX(), nukeTargetPos.getY(), nukeTargetPos.getZ(), 22f, true, Level.ExplosionInteraction.BLOCK);
-            for (LivingEntity le : level.getEntitiesOfClass(LivingEntity.class, new AABB(nukeTargetPos).inflate(45))) {
+            level.explode(null, targetPos.getX(), targetPos.getY(), targetPos.getZ(), 22f, true, Level.ExplosionInteraction.BLOCK);
+            for (LivingEntity le : level.getEntitiesOfClass(LivingEntity.class, new AABB(targetPos).inflate(45))) {
                 le.addEffect(new MobEffectInstance(MobEffects.WITHER, 300, 1));
                 le.addEffect(new MobEffectInstance(MobEffects.NAUSEA, 300, 0));
                 le.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100, 0));
             }
-        } else level.sendParticles(ParticleTypes.ASH, nukeTargetPos.getX(), nukeTargetPos.getY() + 15, nukeTargetPos.getZ(), 80, 20, 10, 20, 0.02);
+        } else level.sendParticles(ParticleTypes.ASH, targetPos.getX(), targetPos.getY() + 15, targetPos.getZ(), 80, 20, 10, 20, 0.02);
     }
 
     private static void runPlayerDisaster(ServerLevel level, ServerPlayer p) {
@@ -177,23 +248,48 @@ public class NaturalDisastersMod implements ModInitializer {
                 }
             }
             case "ACID_RAIN" -> {
-                level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "weather thunder 20");
+                cmd(level, "weather thunder 20");
                 if (level.canSeeSky(pos)) {
                     p.addEffect(new MobEffectInstance(MobEffects.POISON, 40, 1));
                     if (level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)) level.setBlockAndUpdate(pos.below(), Blocks.DIRT.defaultBlockState());
                 }
-            }
-            case "LANDSLIDE" -> {
-                if (disasterDuration % 3 == 0) {
-                    for (int i = 0; i < 4; i++) {
-                        BlockPos sp = pos.offset(RANDOM.nextInt(20) - 10, RANDOM.nextInt(8) + 2, RANDOM.nextInt(20) - 10);
-                        BlockState st = level.getBlockState(sp);
-                        if (!st.isAir() && (st.is(Blocks.DIRT) || st.is(Blocks.GRASS_BLOCK) || st.is(Blocks.STONE) || st.is(Blocks.SAND))) {
-                            level.removeBlock(sp, false); FallingBlockEntity.fall(level, sp, st);
-                        } else if (st.isAir()) FallingBlockEntity.fall(level, sp.above(5), RANDOM.nextBoolean() ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState());
-                    }
-                }
-            }
-        }
-    }
+}
+case "LANDSLIDE" -> {
+if (disasterDuration % 3 == 0) {
+for (int i = 0; i < 4; i++) {
+BlockPos sp = pos.offset(RANDOM.nextInt(20) - 10, RANDOM.nextInt(8) + 2, RANDOM.nextInt(20) - 10);
+BlockState st = level.getBlockState(sp);
+if (!st.isAir() && (st.is(Blocks.DIRT) || st.is(Blocks.GRASS_BLOCK) || st.is(Blocks.STONE) || st.is(Blocks.SAND))) {
+level.removeBlock(sp, false); FallingBlockEntity.fall(level, sp, st);
+} else if (st.isAir()) FallingBlockEntity.fall(level, sp.above(5), RANDOM.nextBoolean() ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState());
+}
+}
+}
+case "LIGHTNING_STORM" -> {
+cmd(level, "weather thunder 20");
+if (disasterDuration % 10 == 0) {
+BlockPos lp = pos.offset(RANDOM.nextInt(32) - 16, 0, RANDOM.nextInt(32) - 16);
+LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(level, EntitySpawnReason.EVENT);
+if (bolt != null) { bolt.setPos(lp.getX(), lp.getY(), lp.getZ()); level.addFreshEntity(bolt); }
+}
+}
+case "BLIZZARD" -> {
+level.sendParticles(ParticleTypes.SNOWFLAKE, pos.getX(), pos.getY() + 6, pos.getZ(), 60, 12, 5, 12, 0.05);
+p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
+if (disasterDuration % 10 == 0 && level.canSeeSky(pos)) p.hurt(level.damageSources().freeze(), 1.0f);
+for (int i = 0; i < 5; i++) {
+BlockPos fp = pos.offset(RANDOM.nextInt(20) - 10, -1, RANDOM.nextInt(20) - 10);
+if (level.getBlockState(fp).is(Blocks.WATER)) level.setBlockAndUpdate(fp, Blocks.ICE.defaultBlockState());
+else if (level.getBlockState(fp.above()).isAir() && level.getBlockState(fp).isSolid()) level.setBlockAndUpdate(fp.above(), Blocks.SNOW.defaultBlockState());
+}
+}
+case "ZOMBIE_APOCALYPSE" -> {
+if (disasterDuration % 40 == 0) {
+BlockPos zp = pos.offset(RANDOM.nextInt(24) - 12, 1, RANDOM.nextInt(24) - 12);
+Zombie z = EntityType.ZOMBIE.create(level, EntitySpawnReason.EVENT);
+if (z != null) { z.setPos(zp.getX(), zp.getY(), zp.getZ()); level.addFreshEntity(z); }
+}
+}
+}
+}
 }
