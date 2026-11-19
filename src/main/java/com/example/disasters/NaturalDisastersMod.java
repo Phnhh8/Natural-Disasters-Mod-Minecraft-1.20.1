@@ -23,12 +23,8 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
-import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
 import net.minecraft.world.item.CreativeModeTab;
@@ -179,7 +175,6 @@ public class NaturalDisastersMod implements ModInitializer {
             level.addFreshEntity(fb);
         }
     }
-
     private static void runSinkhole(ServerLevel level) {
         if (disasterDuration % 3 == 0) {
             int depth = (120 - disasterDuration) / 3;
@@ -253,43 +248,41 @@ public class NaturalDisastersMod implements ModInitializer {
                     p.addEffect(new MobEffectInstance(MobEffects.POISON, 40, 1));
                     if (level.getBlockState(pos.below()).is(Blocks.GRASS_BLOCK)) level.setBlockAndUpdate(pos.below(), Blocks.DIRT.defaultBlockState());
                 }
-}
-case "LANDSLIDE" -> {
-if (disasterDuration % 3 == 0) {
-for (int i = 0; i < 4; i++) {
-BlockPos sp = pos.offset(RANDOM.nextInt(20) - 10, RANDOM.nextInt(8) + 2, RANDOM.nextInt(20) - 10);
-BlockState st = level.getBlockState(sp);
-if (!st.isAir() && (st.is(Blocks.DIRT) || st.is(Blocks.GRASS_BLOCK) || st.is(Blocks.STONE) || st.is(Blocks.SAND))) {
-level.removeBlock(sp, false); FallingBlockEntity.fall(level, sp, st);
-} else if (st.isAir()) FallingBlockEntity.fall(level, sp.above(5), RANDOM.nextBoolean() ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState());
-}
-}
-}
-case "LIGHTNING_STORM" -> {
-cmd(level, "weather thunder 20");
-if (disasterDuration % 10 == 0) {
-BlockPos lp = pos.offset(RANDOM.nextInt(32) - 16, 0, RANDOM.nextInt(32) - 16);
-LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(level, EntitySpawnReason.EVENT);
-if (bolt != null) { bolt.setPos(lp.getX(), lp.getY(), lp.getZ()); level.addFreshEntity(bolt); }
-}
-}
-case "BLIZZARD" -> {
-level.sendParticles(ParticleTypes.SNOWFLAKE, pos.getX(), pos.getY() + 6, pos.getZ(), 60, 12, 5, 12, 0.05);
-p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
-if (disasterDuration % 10 == 0 && level.canSeeSky(pos)) p.hurt(level.damageSources().freeze(), 1.0f);
-for (int i = 0; i < 5; i++) {
-BlockPos fp = pos.offset(RANDOM.nextInt(20) - 10, -1, RANDOM.nextInt(20) - 10);
-if (level.getBlockState(fp).is(Blocks.WATER)) level.setBlockAndUpdate(fp, Blocks.ICE.defaultBlockState());
-else if (level.getBlockState(fp.above()).isAir() && level.getBlockState(fp).isSolid()) level.setBlockAndUpdate(fp.above(), Blocks.SNOW.defaultBlockState());
-}
-}
-case "ZOMBIE_APOCALYPSE" -> {
-if (disasterDuration % 40 == 0) {
-BlockPos zp = pos.offset(RANDOM.nextInt(24) - 12, 1, RANDOM.nextInt(24) - 12);
-Zombie z = EntityType.ZOMBIE.create(level, EntitySpawnReason.EVENT);
-if (z != null) { z.setPos(zp.getX(), zp.getY(), zp.getZ()); level.addFreshEntity(z); }
-}
-}
-}
-}
+            }
+            case "LANDSLIDE" -> {
+                if (disasterDuration % 3 == 0) {
+                    for (int i = 0; i < 4; i++) {
+                        BlockPos sp = pos.offset(RANDOM.nextInt(20) - 10, RANDOM.nextInt(8) + 2, RANDOM.nextInt(20) - 10);
+                        BlockState st = level.getBlockState(sp);
+                        if (!st.isAir() && (st.is(Blocks.DIRT) || st.is(Blocks.GRASS_BLOCK) || st.is(Blocks.STONE) || st.is(Blocks.SAND))) {
+                            level.removeBlock(sp, false); FallingBlockEntity.fall(level, sp, st);
+                        } else if (st.isAir()) FallingBlockEntity.fall(level, sp.above(5), RANDOM.nextBoolean() ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState());
+                    }
+                }
+            }
+            case "LIGHTNING_STORM" -> {
+                cmd(level, "weather thunder 20");
+                if (disasterDuration % 10 == 0) {
+                    BlockPos lp = pos.offset(RANDOM.nextInt(32) - 16, 0, RANDOM.nextInt(32) - 16);
+                    cmd(level, "summon minecraft:lightning_bolt " + lp.getX() + " " + lp.getY() + " " + lp.getZ());
+                }
+            }
+            case "BLIZZARD" -> {
+                level.sendParticles(ParticleTypes.SNOWFLAKE, pos.getX(), pos.getY() + 6, pos.getZ(), 60, 12, 5, 12, 0.05);
+                p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
+                if (disasterDuration % 10 == 0 && level.canSeeSky(pos)) p.hurt(level.damageSources().freeze(), 1.0f);
+                for (int i = 0; i < 5; i++) {
+                    BlockPos fp = pos.offset(RANDOM.nextInt(20) - 10, -1, RANDOM.nextInt(20) - 10);
+                    if (level.getBlockState(fp).is(Blocks.WATER)) level.setBlockAndUpdate(fp, Blocks.ICE.defaultBlockState());
+                    else if (level.getBlockState(fp.above()).isAir() && level.getBlockState(fp).isSolid()) level.setBlockAndUpdate(fp.above(), Blocks.SNOW.defaultBlockState());
+                }
+            }
+            case "ZOMBIE_APOCALYPSE" -> {
+                if (disasterDuration % 40 == 0) {
+                    BlockPos zp = pos.offset(RANDOM.nextInt(24) - 12, 1, RANDOM.nextInt(24) - 12);
+                    cmd(level, "summon minecraft:zombie " + zp.getX() + " " + zp.getY() + " " + zp.getZ());
+                }
+            }
+        }
+    }
 }
