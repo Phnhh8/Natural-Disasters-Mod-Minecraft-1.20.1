@@ -12,11 +12,10 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -61,13 +60,13 @@ public class NaturalDisastersMod implements ModInitializer {
     public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP", "Dừng Toàn Bộ Thảm Họa");
 
     private static Item reg(String name, String type, String displayName) {
-        Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
         return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type, displayName));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
-        BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
+        BuiltInRegistries.CREATIVE_MODE_TAB, ResourceLocation.fromNamespaceAndPath(MODID, "disaster_tab"),
         FabricItemGroup.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
@@ -81,7 +80,7 @@ public class NaturalDisastersMod implements ModInitializer {
     public void onInitialize() {
         Object initTab = DISASTER_TAB;
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("disaster").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+            dispatcher.register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
                 .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
                     startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
                     return 1;
