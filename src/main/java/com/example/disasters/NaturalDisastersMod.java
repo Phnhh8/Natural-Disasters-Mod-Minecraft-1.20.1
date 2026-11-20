@@ -46,29 +46,29 @@ public class NaturalDisastersMod implements ModInitializer {
     private static BlockPos targetPos = null;
     private static final Random RANDOM = new Random();
 
-    public static final Item METEOR_CALLER = reg("meteor_caller", "METEOR");
-    public static final Item EARTHQUAKE_CALLER = reg("earthquake_caller", "EARTHQUAKE");
-    public static final Item ACID_RAIN_CALLER = reg("acid_rain_caller", "ACID_RAIN");
-    public static final Item TORNADO_CALLER = reg("tornado_caller", "TORNADO");
-    public static final Item LANDSLIDE_CALLER = reg("landslide_caller", "LANDSLIDE");
-    public static final Item NUKE_CALLER = reg("nuke_caller", "NUKE");
-    public static final Item TSUNAMI_CALLER = reg("tsunami_caller", "TSUNAMI");
-    public static final Item VOLCANO_CALLER = reg("volcano_caller", "VOLCANO");
-    public static final Item SINKHOLE_CALLER = reg("sinkhole_caller", "SINKHOLE");
-    public static final Item LIGHTNING_CALLER = reg("lightning_caller", "LIGHTNING_STORM");
-    public static final Item BLIZZARD_CALLER = reg("blizzard_caller", "BLIZZARD");
-    public static final Item ZOMBIE_CALLER = reg("zombie_caller", "ZOMBIE_APOCALYPSE");
-    public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP");
+    public static final Item METEOR_CALLER = reg("meteor_caller", "METEOR", "Triệu Hồi Mưa Thiên Thạch");
+    public static final Item EARTHQUAKE_CALLER = reg("earthquake_caller", "EARTHQUAKE", "Triệu Hồi Động Đất");
+    public static final Item ACID_RAIN_CALLER = reg("acid_rain_caller", "ACID_RAIN", "Triệu Hồi Mưa Axit");
+    public static final Item TORNADO_CALLER = reg("tornado_caller", "TORNADO", "Triệu Hồi Lốc Xoáy");
+    public static final Item LANDSLIDE_CALLER = reg("landslide_caller", "LANDSLIDE", "Triệu Hồi Sạt Lở Đất");
+    public static final Item NUKE_CALLER = reg("nuke_caller", "NUKE", "Triệu Hồi Bom Hạt Nhân");
+    public static final Item TSUNAMI_CALLER = reg("tsunami_caller", "TSUNAMI", "Triệu Hồi Sóng Thần");
+    public static final Item VOLCANO_CALLER = reg("volcano_caller", "VOLCANO", "Triệu Hồi Núi Lửa");
+    public static final Item SINKHOLE_CALLER = reg("sinkhole_caller", "SINKHOLE", "Triệu Hồi Hố Sụt");
+    public static final Item LIGHTNING_CALLER = reg("lightning_caller", "LIGHTNING_STORM", "Triệu Hồi Bão Sấm Sét");
+    public static final Item BLIZZARD_CALLER = reg("blizzard_caller", "BLIZZARD", "Triệu Hồi Bão Tuyết");
+    public static final Item ZOMBIE_CALLER = reg("zombie_caller", "ZOMBIE_APOCALYPSE", "Triệu Hồi Đại Dịch Zombie");
+    public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP", "Dừng Toàn Bộ Thảm Họa");
 
-    private static Item reg(String name, String type) {
+    private static Item reg(String name, String type, String displayName) {
         Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
-        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type));
+        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type, displayName));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
         BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricItemGroup.builder().title(Component.translatable("itemGroup.naturaldisasters")).icon(() -> new ItemStack(NUKE_CALLER))
+        FabricItemGroup.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
                 out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
@@ -113,7 +113,10 @@ public class NaturalDisastersMod implements ModInitializer {
 
     public static class DisasterItem extends Item {
         private final String type;
-        public DisasterItem(Properties props, String type) { super(props); this.type = type; }
+        private final String displayName;
+        public DisasterItem(Properties props, String type, String displayName) { super(props); this.type = type; this.displayName = displayName; }
+        @Override
+        public Component getName(ItemStack stack) { return Component.literal(displayName); }
         @Override
         public InteractionResult use(Level level, Player player, InteractionHand hand) {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
