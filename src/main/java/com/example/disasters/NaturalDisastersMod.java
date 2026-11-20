@@ -1,9 +1,10 @@
 package com.example.disasters;
+
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -67,7 +68,7 @@ public class NaturalDisastersMod implements ModInitializer {
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
         BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricCreativeModeTab.builder().title(Component.translatable("itemGroup.naturaldisasters")).icon(() -> new ItemStack(NUKE_CALLER))
+        FabricItemGroup.builder().title(Component.translatable("itemGroup.naturaldisasters")).icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
                 out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
@@ -87,7 +88,7 @@ public class NaturalDisastersMod implements ModInitializer {
                 })));
         });
 
-        ServerTickEvents.END_LEVEL_TICK.register(level -> {
+        ServerTickEvents.END_WORLD_TICK.register(level -> {
             if (level.players().isEmpty()) return;
             if (++tickCounter >= 6000) {
                 tickCounter = 0;
@@ -118,7 +119,7 @@ public class NaturalDisastersMod implements ModInitializer {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
                     activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; targetPos = null;
-                    player.sendSystemMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"));
+                    player.displayClientMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"), false);
                 } else startDisaster(sl, type, player.blockPosition());
                 player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
             }
@@ -135,7 +136,7 @@ public class NaturalDisastersMod implements ModInitializer {
         else if (type.equals("VOLCANO")) targetPos = pos.offset(24, 0, 24);
         else if (type.equals("SINKHOLE")) targetPos = pos;
         else if (type.equals("ZOMBIE_APOCALYPSE")) cmd(level, "time set midnight");
-        for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
+        for (ServerPlayer p : level.players()) p.displayClientMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type), false);
     }
 
     private static void cmd(ServerLevel l, String c) {
@@ -233,7 +234,7 @@ public class NaturalDisastersMod implements ModInitializer {
         if (disasterDuration > 100) {
             if (disasterDuration % 20 == 0) {
                 for (ServerPlayer p : level.players()) {
-                    p.sendSystemMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"));
+                    p.displayClientMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"), false);
                     level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.MASTER, 1f, 0.5f);
                 }
             }
