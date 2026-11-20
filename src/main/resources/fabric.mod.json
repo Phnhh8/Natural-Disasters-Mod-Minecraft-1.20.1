@@ -3,7 +3,7 @@
   "id": "naturaldisasters",
   "version": "1.0.0",
   "name": "Natural Disasters Mod",
-  "description": "Adds 12 Natural Disasters to Minecraft 1.21.11 Fabric.",
+  "description": "Adds 12 Natural Disasters and Disaster Stopper to Minecraft 1.21.10 Fabric.",
   "authors": ["User"],
   "license": "MIT",
   "environment": "*",
@@ -14,7 +14,7 @@
   },
   "depends": {
     "fabricloader": ">=0.16.0",
-    "minecraft": "~1.21.11",
+    "minecraft": "~1.21.10",
     "java": ">=21",
     "fabric-api": "*"
   }
