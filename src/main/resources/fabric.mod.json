@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "naturaldisasters",
-  "version": "${version}",
+  "version": "1.0.0",
   "name": "Natural Disasters Mod",
-  "description": "Natural Disasters for 26.3",
-  "authors": ["Phnhh8"],
+  "description": "Adds 12 Natural Disasters to Minecraft 1.21.11 Fabric.",
+  "authors": ["User"],
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
@@ -13,8 +13,9 @@
     ]
   },
   "depends": {
-    "fabricloader": ">=0.19.5",
-    "minecraft": "~26.3",
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
     "fabric-api": "*"
   }
 }
