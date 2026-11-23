@@ -26,7 +26,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.LargeFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -88,7 +88,7 @@ public class NaturalDisastersMod implements ModInitializer {
                 })));
         });
 
-        ServerTickEvents.END_WORLD_TICK.register(level -> {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
             if (level.players().isEmpty()) return;
             if (++tickCounter >= 6000) {
                 tickCounter = 0;
@@ -121,7 +121,7 @@ public class NaturalDisastersMod implements ModInitializer {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
                     activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; targetPos = null;
-                    player.displayClientMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"), false);
+                    player.sendSystemMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"));
                 } else startDisaster(sl, type, player.blockPosition());
                 player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
             }
@@ -138,7 +138,7 @@ public class NaturalDisastersMod implements ModInitializer {
         else if (type.equals("VOLCANO")) targetPos = pos.offset(24, 0, 24);
         else if (type.equals("SINKHOLE")) targetPos = pos;
         else if (type.equals("ZOMBIE_APOCALYPSE")) cmd(level, "time set midnight");
-        for (ServerPlayer p : level.players()) p.displayClientMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type), false);
+        for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
     }
 
     private static void cmd(ServerLevel l, String c) {
@@ -237,7 +237,7 @@ public class NaturalDisastersMod implements ModInitializer {
         if (disasterDuration > 100) {
             if (disasterDuration % 20 == 0) {
                 for (ServerPlayer p : level.players()) {
-                    p.displayClientMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"), false);
+                    p.sendSystemMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"));
                     level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.MASTER, 1f, 0.5f);
                 }
             }
