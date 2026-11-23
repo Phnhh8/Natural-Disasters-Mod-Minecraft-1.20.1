@@ -62,7 +62,7 @@ public class NaturalDisastersMod implements ModInitializer {
     private static Item reg(String name, String type, String displayName) {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
-        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type, displayName));
+        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().stacksTo(1), type, displayName));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
