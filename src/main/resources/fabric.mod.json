@@ -3,7 +3,7 @@
 	"id": "naturaldisasters",
 	"version": "${version}",
 	"name": "Natural Disasters",
-	"description": "Mod thảm họa thiên nhiên cho Minecraft Fabric 1.21.9",
+	"description": "Mod thảm họa thiên nhiên cho Minecraft Fabric 1.21.8",
 	"authors": [
 		"Phnhh_8"
 	],
@@ -15,8 +15,8 @@
 		]
 	},
 	"depends": {
-		"fabricloader": ">=0.17.2",
-		"minecraft": "~1.21.9",
+		"fabricloader": ">=0.16.14",
+		"minecraft": "~1.21.8",
 		"java": ">=21",
 		"fabric-api": "*"
 	}
