@@ -3,8 +3,8 @@ package com.example.disasters;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -12,8 +12,8 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -60,14 +60,14 @@ public class NaturalDisastersMod implements ModInitializer {
     public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP", "Dừng Toàn Bộ Thảm Họa");
 
     private static Item reg(String name, String type, String displayName) {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
+        Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
         return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type, displayName));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
-        BuiltInRegistries.CREATIVE_MODE_TAB, ResourceLocation.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricItemGroup.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
+        BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
+        FabricCreativeModeTab.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
                 out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
@@ -76,11 +76,12 @@ public class NaturalDisastersMod implements ModInitializer {
                 out.accept(DISASTER_STOPPER);
             }).build()
     );
+
     @Override
     public void onInitialize() {
         Object initTab = DISASTER_TAB;
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
+            dispatcher.register(Commands.literal("disaster").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
                     startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
                     return 1;
@@ -109,7 +110,6 @@ public class NaturalDisastersMod implements ModInitializer {
             }
         });
     }
-
     public static class DisasterItem extends Item {
         private final String type;
         private final String displayName;
@@ -167,7 +167,8 @@ public class NaturalDisastersMod implements ModInitializer {
                     if (x * x + z * z <= r * r) {
                         BlockPos bp = targetPos.offset(x, h, z);
                         boolean isCore = (x * x + z * z <= 12 && h > 8);
-                        level.setBlockAndUpdate(bp, isCore ? Blocks.LAVA.defaultBlockState() : (RANDOM.nextBoolean() ? Blocks.BASALT.defaultBlockState() : Blocks.OBSIDIAN.defaultBlockState()));
+                        BlockState state = isCore ? Blocks.LAVA.defaultBlockState() : (RANDOM.nextBoolean() ? Blocks.BASALT.defaultBlockState() : Blocks.OBSIDIAN.defaultBlockState());
+                        level.setBlockAndUpdate(bp, state);
                     }
                 }
             }
@@ -201,6 +202,7 @@ public class NaturalDisastersMod implements ModInitializer {
             }
         }
     }
+
     private static void runSinkhole(ServerLevel level) {
         if (disasterDuration % 3 == 0) {
             int depth = (120 - disasterDuration) / 3;
@@ -215,7 +217,6 @@ public class NaturalDisastersMod implements ModInitializer {
             }
         }
     }
-
     private static void runTornado(ServerLevel level) {
         Vec3 dir = level.players().get(0).position().subtract(tornadoPos).normalize();
         tornadoPos = tornadoPos.add(dir.x * 0.25, 0, dir.z * 0.25);
