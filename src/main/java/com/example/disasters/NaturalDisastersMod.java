@@ -3,8 +3,8 @@ package com.example.disasters;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -12,21 +12,21 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.LargeFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -60,14 +60,14 @@ public class NaturalDisastersMod implements ModInitializer {
     public static final Item DISASTER_STOPPER = reg("disaster_stopper", "STOP", "Dừng Toàn Bộ Thảm Họa");
 
     private static Item reg(String name, String type, String displayName) {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MODID, name);
+        Identifier id = Identifier.fromNamespaceAndPath(MODID, name);
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
-        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().stacksTo(1), type, displayName));
+        return Registry.register(BuiltInRegistries.ITEM, key, new DisasterItem(new Item.Properties().setId(key).stacksTo(1), type, displayName));
     }
 
     public static final CreativeModeTab DISASTER_TAB = Registry.register(
-        BuiltInRegistries.CREATIVE_MODE_TAB, ResourceLocation.fromNamespaceAndPath(MODID, "disaster_tab"),
-        FabricItemGroup.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
+        BuiltInRegistries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MODID, "disaster_tab"),
+        FabricCreativeModeTab.builder().title(Component.literal("Thảm Họa Thiên Nhiên")).icon(() -> new ItemStack(NUKE_CALLER))
             .displayItems((p, out) -> {
                 out.accept(METEOR_CALLER); out.accept(EARTHQUAKE_CALLER); out.accept(ACID_RAIN_CALLER);
                 out.accept(TORNADO_CALLER); out.accept(LANDSLIDE_CALLER); out.accept(NUKE_CALLER);
@@ -81,14 +81,14 @@ public class NaturalDisastersMod implements ModInitializer {
     public void onInitialize() {
         Object initTab = DISASTER_TAB;
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("disaster").requires(s -> s.hasPermission(2))
+            dispatcher.register(Commands.literal("disaster").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.argument("type", StringArgumentType.word()).executes(ctx -> {
                     startDisaster(ctx.getSource().getLevel(), StringArgumentType.getString(ctx, "type").toUpperCase(), BlockPos.containing(ctx.getSource().getPosition()));
                     return 1;
                 })));
         });
 
-        ServerTickEvents.END_WORLD_TICK.register(level -> {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
             if (level.players().isEmpty()) return;
             if (++tickCounter >= 6000) {
                 tickCounter = 0;
@@ -117,16 +117,15 @@ public class NaturalDisastersMod implements ModInitializer {
         @Override
         public Component getName(ItemStack stack) { return Component.literal(displayName); }
         @Override
-        public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-            ItemStack stack = player.getItemInHand(hand);
+        public InteractionResult use(Level level, Player player, InteractionHand hand) {
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
                     activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; targetPos = null;
-                    player.displayClientMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"), false);
+                    player.sendSystemMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"));
                 } else startDisaster(sl, type, player.blockPosition());
-                player.getCooldowns().addCooldown(this, 40);
+                player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
             }
-            return InteractionResultHolder.success(stack);
+            return InteractionResult.SUCCESS;
         }
     }
 
@@ -139,7 +138,7 @@ public class NaturalDisastersMod implements ModInitializer {
         else if (type.equals("VOLCANO")) targetPos = pos.offset(24, 0, 24);
         else if (type.equals("SINKHOLE")) targetPos = pos;
         else if (type.equals("ZOMBIE_APOCALYPSE")) cmd(level, "time set midnight");
-        for (ServerPlayer p : level.players()) p.displayClientMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type), false);
+        for (ServerPlayer p : level.players()) p.sendSystemMessage(Component.literal("§c[CẢNH BÁO] §eThiên tai: §l" + type));
     }
 
     private static void cmd(ServerLevel l, String c) {
@@ -238,7 +237,7 @@ public class NaturalDisastersMod implements ModInitializer {
         if (disasterDuration > 100) {
             if (disasterDuration % 20 == 0) {
                 for (ServerPlayer p : level.players()) {
-                    p.displayClientMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"), false);
+                    p.sendSystemMessage(Component.literal("§4§l[HẠT NHÂN] §eNổ sau: §c" + ((disasterDuration - 100) / 20) + "s"));
                     level.playSound(null, p.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.MASTER, 1f, 0.5f);
                 }
             }
@@ -247,7 +246,7 @@ public class NaturalDisastersMod implements ModInitializer {
             level.explode(null, targetPos.getX(), targetPos.getY(), targetPos.getZ(), 22f, true, Level.ExplosionInteraction.BLOCK);
             for (LivingEntity le : level.getEntitiesOfClass(LivingEntity.class, new AABB(targetPos).inflate(45))) {
                 le.addEffect(new MobEffectInstance(MobEffects.WITHER, 300, 1));
-                le.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 300, 0));
+                le.addEffect(new MobEffectInstance(MobEffects.NAUSEA, 300, 0));
                 le.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100, 0));
             }
         } else level.sendParticles(ParticleTypes.ASH, targetPos.getX(), targetPos.getY() + 15, targetPos.getZ(), 80, 20, 10, 20, 0.02);
@@ -297,7 +296,7 @@ public class NaturalDisastersMod implements ModInitializer {
             }
             case "BLIZZARD" -> {
                 level.sendParticles(ParticleTypes.SNOWFLAKE, pos.getX(), pos.getY() + 6, pos.getZ(), 60, 12, 5, 12, 0.05);
-                p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 1));
+                p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
                 if (disasterDuration % 10 == 0 && level.canSeeSky(pos)) p.hurt(level.damageSources().freeze(), 1.0f);
                 for (int i = 0; i < 5; i++) {
                     BlockPos fp = pos.offset(RANDOM.nextInt(20) - 10, -1, RANDOM.nextInt(20) - 10);
