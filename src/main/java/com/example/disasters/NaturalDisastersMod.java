@@ -19,7 +19,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -117,15 +117,16 @@ public class NaturalDisastersMod implements ModInitializer {
         @Override
         public Component getName(ItemStack stack) { return Component.literal(displayName); }
         @Override
-        public InteractionResult use(Level level, Player player, InteractionHand hand) {
+        public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+            ItemStack stack = player.getItemInHand(hand);
             if (!level.isClientSide() && level instanceof ServerLevel sl) {
                 if (type.equals("STOP")) {
                     activeDisaster = "NONE"; disasterDuration = 0; tornadoPos = null; targetPos = null;
                     player.displayClientMessage(Component.literal("§a[HỆ THỐNG] §fĐã dừng toàn bộ thảm họa!"), false);
                 } else startDisaster(sl, type, player.blockPosition());
-                player.getCooldowns().addCooldown(this.getDefaultInstance(), 40);
+                player.getCooldowns().addCooldown(this, 40);
             }
-            return InteractionResult.SUCCESS;
+            return InteractionResultHolder.success(stack);
         }
     }
 
@@ -246,7 +247,7 @@ public class NaturalDisastersMod implements ModInitializer {
             level.explode(null, targetPos.getX(), targetPos.getY(), targetPos.getZ(), 22f, true, Level.ExplosionInteraction.BLOCK);
             for (LivingEntity le : level.getEntitiesOfClass(LivingEntity.class, new AABB(targetPos).inflate(45))) {
                 le.addEffect(new MobEffectInstance(MobEffects.WITHER, 300, 1));
-                le.addEffect(new MobEffectInstance(MobEffects.NAUSEA, 300, 0));
+                le.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 300, 0));
                 le.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100, 0));
             }
         } else level.sendParticles(ParticleTypes.ASH, targetPos.getX(), targetPos.getY() + 15, targetPos.getZ(), 80, 20, 10, 20, 0.02);
@@ -296,7 +297,7 @@ public class NaturalDisastersMod implements ModInitializer {
             }
             case "BLIZZARD" -> {
                 level.sendParticles(ParticleTypes.SNOWFLAKE, pos.getX(), pos.getY() + 6, pos.getZ(), 60, 12, 5, 12, 0.05);
-                p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
+                p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 1));
                 if (disasterDuration % 10 == 0 && level.canSeeSky(pos)) p.hurt(level.damageSources().freeze(), 1.0f);
                 for (int i = 0; i < 5; i++) {
                     BlockPos fp = pos.offset(RANDOM.nextInt(20) - 10, -1, RANDOM.nextInt(20) - 10);
